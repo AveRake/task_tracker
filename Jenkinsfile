@@ -1,30 +1,47 @@
 pipeline {
     agent any
 
+    environment {
+        COMPOSE_PROJECT_NAME = "tasktracker_deploy"
+    }
+
     stages {
         stage('Checkout') {
-            steps { checkout scm }
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Create .env File') {
+            steps {
+                script {
+                    sh """
+                        echo "POSTGRES_USER=myuser" > .env
+                        echo "POSTGRES_PASSWORD=mypassword" >> .env
+                        echo "POSTGRES_DB=taskdb" >> .env
+                    """
+                }
+            }
         }
 
         stage('Build Image for Testing') {
             steps {
-                // Собираем образ, чтобы прогнать тесты внутри
                 sh 'docker build -t test-image .'
             }
         }
 
         stage('Run Unit Tests') {
             steps {
-                // Запускаем pytest внутри контейнера
-                // Если тесты упадут, пайплайн остановится и Deploy не начнется
                 sh 'docker run --rm test-image pytest'
             }
         }
 
         stage('Deploy') {
             steps {
-                // Этот шаг выполнится ТОЛЬКО если тесты прошли
-                sh 'docker-compose up -d --build'
+                script {
+                    sh 'docker-compose down'
+                    sh 'docker-compose up -d --build'
+                }
             }
         }
     }
